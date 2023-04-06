@@ -1,0 +1,6 @@
+[webapp]
+webapp1 ansible_host=165.22.98.211
+webapp2 ansible_host=159.223.33.175
+
+[db]
+db1 ansible_host=143.198.218.187

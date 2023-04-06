@@ -1,0 +1,56 @@
+- name: Create Droplets
+  hosts: localhost
+  vars_files:
+    - api_token.yaml
+  tasks:
+    - name: Create 3 Droplets
+      community.digitalocean.digital_ocean_droplet:
+        state: present
+        oauth_token: "{{ do_api_token }}"
+        name: "{{ item }}"
+        size: "{{ size }}"
+        region: "{{ region }}"
+        image: "{{ image }}"
+        wait_timeout: 500
+        ssh_keys:
+          - "0f:04:55:58:46:57:a6:d7:d9:4b:0c:45:94:75:12:e2"
+          - "92:98:e3:d7:0f:f7:04:a7:a0:67:e8:16:6c:e8:01:2d"
+        project: "{{ project }}"
+      with_items: "{{ instance_list }}"
+      register: my_droplets
+      when: "'failed' in existing_droplets.results | map(attribute='status') | list"
+
+- name: Copy SSH Key to Droplets
+  hosts: webapp:db
+  tasks:
+    - name: Copy SSH Key to Droplets
+      ansible.posix.authorized_key:
+        user: "{{ droplet_info.ansible_user }}"
+        key: "{{ lookup('file', '~/.ssh/id_ed25519.pub') }}"
+        state: present
+      vars:
+        droplet_info: "{{ item.data.droplet }}"
+      loop:
+        - "{{ my_droplets.results }}"
+
+- name: Show Droplet info
+  hosts: localhost
+  tasks:
+    - name: Display Droplet info
+      ansible.builtin.debug:
+        msg: |
+          Droplet ID is {{ item.data.droplet.id }}
+          First Public IPv4 is {{ (item.data.droplet.networks.v4 | selectattr('type', 'equalto', 'public')).0.ip_address | default('<none>', true) }}
+          First Private IPv4 is {{ (item.data.droplet.networks.v4 | selectattr('type', 'equalto', 'private')).0.ip_address | default('<none>', true) }}
+      loop: "{{ my_droplets.results }}"
+
+- name: Create Load Balancer
+  community.digitalocean.digital_ocean_load_balancer:
+    state: present
+    oauth_token: "{{ do_api_token }}"
+    name: myloadbalancer
+    algorithm: round_robin
+    droplets: "{{ webapp_droplets.results | map(attribute='data.droplet.id') | list }}"
+    region: sgp1
+    project: Ansible
+  register: load_balancer

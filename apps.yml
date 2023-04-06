@@ -1,0 +1,17 @@
+- name: Setup Database Server
+  hosts: db
+  become: true
+  become_method: sudo
+  connection: ssh
+  roles:
+    - python
+    - mysql_db
+
+- name: Setup Web Servers
+  hosts: webapp
+  become: true
+  become_method: sudo
+  connection: ssh
+  roles:
+    - python
+    - flask_web

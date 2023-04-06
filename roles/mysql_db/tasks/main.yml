@@ -1,0 +1,41 @@
+- name: Install MySQL database
+  ansible.builtin.apt:
+    name: "{{ item }}"
+    state: present
+    force: true
+  with_items:
+    - mysql-server
+    - mysql-client
+
+- name: Update MySQL Configuration file to accept connections from all interfaces
+  community.general.ini_file:
+    path: /etc/mysql/my.cnf
+    section: mysqld
+    option: bind-address
+    value: 0.0.0.0
+    mode: "0644"
+
+- name: Start MySQL Service
+  ansible.builtin.service:
+    name: mysql
+    state: started
+    enabled: true
+
+- name: Create Application Database
+  community.mysql.mysql_db:
+    name: "{{ db_name }}"
+    state: present
+
+- name: Create Database user
+  community.mysql.mysql_user:
+    name: "{{ db_user }}"
+    password: "{{ db_user_password }}"
+    priv: '*.*:ALL'
+    state: present
+    host: '%'
+
+- name: Restart MySQL Service
+  ansible.builtin.service:
+    name: mysql
+    state: restarted
+    enabled: true

@@ -1,0 +1,71 @@
+- name: Create Load Balancer and Firewall Rules
+  hosts: localhost
+  vars_files:
+    - api_token.yaml
+  tasks:
+    - name: Create Load Balancer
+      community.digitalocean.digital_ocean_load_balancer:
+        state: present
+        oauth_token: "{{ do_api_token }}"
+        name: my-load-balancer
+        region: "{{ region }}"
+        algorithm: round_robin
+        health_check:
+          protocol: http
+          port: 80
+          path: /health
+          check_interval_seconds: 10
+          response_timeout_seconds: 5
+          healthy_threshold: 3
+          unhealthy_threshold: 3
+        droplets:
+          - "{{ groups['webapp'] }}"
+      register: load_balancer
+
+- name: Create Firewall Rules for Web App Droplets
+  community.digitalocean.digital_ocean_firewall:
+    state: present
+    oauth_token: "{{ do_api_token }}"
+    name: web-app-firewall
+    droplets: "{{ groups['webapp'] }}"
+    inbound_rules:
+      - protocol: tcp
+        ports:
+          - "22"
+          - "80"
+          - "443"
+    outbound_rules:
+      - protocol: icmp
+      - protocol: tcp
+        ports:
+          - "80"
+          - "443"
+  when: "'my-load-balancer' in load_balancer.tags"
+
+- name: Create Firewall Rules for DB Droplets
+  community.digitalocean.digital_ocean_firewall:
+    state: present
+    oauth_token: "{{ do_api_token }}"
+    name: db-firewall
+    droplets: "{{ groups['db'] }}"
+    inbound_rules:
+      - protocol: tcp
+        ports:
+          - "22"
+          - "3306"
+    outbound_rules:
+      - protocol: icmp
+      - protocol: tcp
+        ports:
+          - "3306"
+  when: "'my-load-balancer' in load_balancer.tags"
+
+- name: Send notification email
+  mail:
+    host: smtp.gmail.com
+    port: 465
+    username: nurmufid.255@gmail.com
+    password: "{{ g_password }}"
+    to: Mufid <nurmufid.255@gmail.com>
+    subject: Ansible
+    body: 'Ansible notification mail test'
